@@ -1,3 +1,6 @@
+# coding: utf8
+from __future__ import print_function, unicode_literals
+
 from bs4 import BeautifulSoup as bs
 import requests
 import re
@@ -5,39 +8,46 @@ import re
 
 class ByflyIsXponParser(object):
     PARSER_URL = 'http://byfly.by'
-    STREET = 'Либкнехта'
-    XPON_COME_SOON = 'Переключение на технологию xPON планируется в ближайшее время'
-    XPON_AVAILABLE = 'Техническая возможность подключения по технологии xPON имеется'
+    STREET = u'Либкнехта'
+    XPON_COME_SOON = u'Переключение на технологию xPON планируется в ближайшее время'
+    XPON_AVAILABLE = u'Техническая возможность подключения по технологии xPON имеется'
     XPON_CHECK_URL = (
-        'http://www.byfly.by/gPON-spisok-domov?field_obl_x_value_many_to_one=6&field_street_x_value=&field_ulica_x_value=%s&field_number_x_value=&field_sostoynie_x_value_many_to_one=All' % (
-            STREET))
+        'http://www.byfly.by/gPON-spisok-domov?field_obl_x_value_many_to_one=6&field_street_x_value=&field_ulica_x_value={}&field_number_x_value=&field_sostoynie_x_value_many_to_one=All'
+        )
 
-    def get_result_dict(self):
-        r = requests.get(self.XPON_CHECK_URL)
+    FIELD_CLASS_MAP = {
+        "region": "views-field-field-obl-x-value",
+        "city": "views-field views-field-field-street-x-value",
+        "street": "views-field-field-ulica-x-value",
+        "number": "views-field-field-number-x-value",
+        "status": "views-field-field-sostoynie-x-value",
+    }
+
+    def check_street(self, street_name):
+        r = requests.get(self.XPON_CHECK_URL.format(street_name))
         soup = bs(r.text, 'html.parser')
-        # Need to parse all pagination
-        data = soup.find_all('td', class_='views-field')
-        data = self.__clean_data(str(data))
-        data = data.split('\n')
-        result = [[{"region": data[a].strip(), "city": data[a+1].strip(), "street": data[a+2].strip(), "house": data[a+3].strip(), "status": data[a+4].strip()}] for a in range(1, len(data), 5)]
 
-        for lis in result:
-            for dic in lis:
-                if dic['status'] == self.XPON_COME_SOON:
-                    print(dic['status'])
+        rows = soup.find_all('tr', class_=re.compile(r"(odd|even)"))
+        result = [self._street_connection_data(r) for r in rows]
+        return result
 
-    def __clean_data(self, data):
-        res = data
-        res = res.replace(',', '')
-        res = res.replace('  ', '')
-        res = res.replace('[', '')
-        res = res.replace(']', '')
-        res = re.sub(r'(\<(/?[^\>]+)\>)', r'', res)
-        return res
+    def _street_connection_data(self, street_row):
+        status_data = {}
+
+        for k, v in self.FIELD_CLASS_MAP.items():
+            el = street_row.find('td', class_=v)
+            status_data[k] = el.text.strip()
+        return status_data
 
 
 def main():
-    obj = ByflyIsXponParser()
-    obj.get_result_dict()
+    parser = ByflyIsXponParser()
+    # parser.get_result_dict()
+    street_avail_data = parser.check_street(u"Либкнехта")
+    for s in street_avail_data:
+        if s["status"] == parser.XPON_COME_SOON:
+            print("{}, {} - {}".format(s["street"], s["number"],
+                  parser.XPON_COME_SOON))
 
-main()
+if __name__ == '__main__':
+    main()
