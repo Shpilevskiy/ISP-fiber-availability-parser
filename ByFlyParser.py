@@ -1,9 +1,11 @@
 # coding: utf8
 from __future__ import print_function, unicode_literals
 
-from bs4 import BeautifulSoup as bs
-import requests
+import argparse
 import re
+
+import requests
+from bs4 import BeautifulSoup as bs
 
 
 class ByflyIsXponParser(object):
@@ -33,11 +35,17 @@ class ByflyIsXponParser(object):
         "status": "views-field-field-sostoynie-x-value",
     }
 
-    def __init__(self, region=u"Минск", city=u"", street_name=u"", number=u""):
-        self.result = self.check_street(region=region, city=city, street_name=street_name, number=number)
+    def __init__(self, region=u"Минск", city=u"",
+                 street_name=u"", number=u""):
+        self.result = self.check_street(region=region, city=city,
+                                        street_name=street_name, number=number)
 
-    def check_street(self, region=u"Минск", city=u"", street_name=u"", number=u""):
-        r = requests.get(self.XPON_CHECK_URL.format(self.REGIONS_MAP[region], city, street_name, number))
+    def check_street(self, region=u"Минск", city=u"",
+                     street_name=u"", number=u""):
+        r = requests.get(self.XPON_CHECK_URL.format(self.REGIONS_MAP[region],
+                                                    city,
+                                                    street_name,
+                                                    number))
         soup = bs(r.text, "html.parser")
 
         self.result = []
@@ -59,13 +67,31 @@ class ByflyIsXponParser(object):
         return status_data
 
 
-def main():
-    parser = ByflyIsXponParser(region=u"Минск", street_name=u"Либкнехта", number=u"")
-    for s in parser.result:
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('street',
+                        help=u"Имя улицы, для которой необходимо проверить наличие подключения.")
+    parser.add_argument('--number', '-n',
+                        help=u"Номер дома, для которого необходимо проверить подключение.",
+                        default=""
+                        )
+    return parser.parse_args()
+
+
+def print_result(results):
+    for s in results:
         print("{} {} - {}".format(s["street"], s["number"],
                                   s["status"]))
 
-    print(parser.check_street(street_name="Алибегова"))
+
+def main():
+    args = parse_args()
+    parser = ByflyIsXponParser(region=u"Минск",
+                               street_name=args.street,
+                               number=args.number)
+    print_result(parser.result)
+
+    print_result(parser.check_street(street_name="Алибегова"))
 
 
 if __name__ == "__main__":
