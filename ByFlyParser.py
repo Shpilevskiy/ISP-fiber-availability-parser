@@ -8,7 +8,6 @@ import re
 import requests, grequests
 from bs4 import BeautifulSoup as bs
 
-import time
 
 class ByflyIsXponParser(object):
     PARSER_URL = "http://byfly.by{}"
@@ -42,8 +41,8 @@ class ByflyIsXponParser(object):
     def __init__(self):
         self.result = []
 
-    def check_street(self, region=u"Минск", city=u"Минск",
-                     street_name=u"", number=u""):
+    def check_address(self, region=u"Минск", city=u"Минск",
+                      street_name=u"", number=u""):
 
         links = self._get_pagination_pages_links(region=region, city=city, street_name=street_name, number=number)
         links = list(links)
@@ -110,14 +109,13 @@ def print_result(results):
 
 
 def main():
-    a = time.time()
     args = parse_args()
     parser = ByflyIsXponParser()
-    parser.check_street(region=args.region.lower(),
-                        street_name=args.street,
-                        number=args.number)
-    b = time.time()
+    parser.check_address(region=args.region.lower(),
+                         street_name=args.street,
+                         number=args.number)
     print_result(parser.result)
-    print(b-a)
+
+
 if __name__ == "__main__":
     main()
