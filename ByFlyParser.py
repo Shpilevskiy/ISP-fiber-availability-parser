@@ -18,13 +18,13 @@ class ByflyIsXponParser(object):
     )
 
     REGIONS_MAP = {
-        "Брестская": "0",
-        "Витебская": "1",
-        "Гомельская": "2",
-        "Гродненская": "3",
-        "Минская": "4",
-        "Могилевская": "5",
-        "Минск": "6"
+        "брестская": "0",
+        "витебская": "1",
+        "гомельская": "2",
+        "гродненская": "3",
+        "минская": "4",
+        "могилевская": "5",
+        "минск": "6"
     }
 
     FIELD_CLASS_MAP = {
@@ -40,7 +40,7 @@ class ByflyIsXponParser(object):
         self.result = self.check_street(region=region, city=city,
                                         street_name=street_name, number=number)
 
-    def check_street(self, region=u"Минск", city=u"",
+    def check_street(self, region=u"Минск", city=u"Минск",
                      street_name=u"", number=u""):
         r = requests.get(self.XPON_CHECK_URL.format(self.REGIONS_MAP[region],
                                                     city,
@@ -69,8 +69,12 @@ class ByflyIsXponParser(object):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('street',
-                        help=u"Имя улицы, для которой необходимо проверить наличие подключения.")
+    parser.add_argument('--street', '-s',
+                        help=u"Имя улицы, для которой необходимо проверить наличие подключения.",
+                        default="")
+    parser.add_argument('--region', '-r',
+                        help=u"Имя области для поиска. (Бресткая, Витебская и т.д.)",
+                        default=u"Минск")
     parser.add_argument('--number', '-n',
                         help=u"Номер дома, для которого необходимо проверить подключение.",
                         default=""
@@ -86,12 +90,10 @@ def print_result(results):
 
 def main():
     args = parse_args()
-    parser = ByflyIsXponParser(region=u"Минск",
+    parser = ByflyIsXponParser(region=args.region.lower(),
                                street_name=args.street,
                                number=args.number)
     print_result(parser.result)
-
-    print_result(parser.check_street(street_name="Алибегова"))
 
 
 if __name__ == "__main__":
