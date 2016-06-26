@@ -1,21 +1,25 @@
 # coding: utf8
 from __future__ import print_function, unicode_literals
+from urllib.parse import urlparse, parse_qs
 
 import argparse
 import re
 
-import requests
+import requests, grequests
 from bs4 import BeautifulSoup as bs
 
+import time
 
 class ByflyIsXponParser(object):
     PARSER_URL = "http://byfly.by{}"
     XPON_COME_SOON = u"Переключение на технологию xPON планируется в ближайшее время"
     XPON_AVAILABLE = u"Техническая возможность подключения по технологии xPON имеется"
     XPON_CHECK_URL = (
-        "http://www.byfly.by/gPON-spisok-domov?field_obl_x_value_many_to_one={}&field_street_x_value={}&"
+        "http://www.byfly.by/gPON-spisok-domov?page={}&field_obl_x_value_many_to_one={}&field_street_x_value={}&"
         "field_ulica_x_value={}&field_number_x_value={}&field_sostoynie_x_value_many_to_one=All"
     )
+
+    PAGE_STATEMENT = '0,0,0,0,0,0,0,0,0,0,{}'
 
     REGIONS_MAP = {
         "брестская": "0",
@@ -35,29 +39,46 @@ class ByflyIsXponParser(object):
         "status": "views-field-field-sostoynie-x-value",
     }
 
-    def __init__(self, region=u"Минск", city=u"",
-                 street_name=u"", number=u""):
-        self.result = self.check_street(region=region, city=city,
-                                        street_name=street_name, number=number)
+    def __init__(self):
+        self.result = []
 
     def check_street(self, region=u"Минск", city=u"Минск",
                      street_name=u"", number=u""):
-        r = requests.get(self.XPON_CHECK_URL.format(self.REGIONS_MAP[region],
-                                                    city,
-                                                    street_name,
-                                                    number))
-        soup = bs(r.text, "html.parser")
 
-        self.result = []
-        while True:
+        links = self._get_pagination_pages_links(region=region, city=city, street_name=street_name, number=number)
+        links = list(links)
+        rs = (grequests.get(l) for l in links)
+        results = grequests.map(rs)
+        for response in results:
+            soup = bs(response.text, "html.parser")
             rows = soup.find_all("tr", class_=re.compile(r"(odd|even)"))
             self.result += [self._street_connection_data(r) for r in rows]
-            next_page_link = soup.find("a", title=u"На следующую страницу", href=True)
-            if not next_page_link:
-                break
-            next_r = requests.get(self.PARSER_URL.format(next_page_link["href"]))
-            soup = bs(next_r.text, "html.parser")
         return self.result
+
+    def _get_pagination_pages_links(self, region, city,
+                                    street_name, number):
+
+        default_link = self.XPON_CHECK_URL.format(self.PAGE_STATEMENT.format('0'),
+                                                  self.REGIONS_MAP[region],
+                                                  city,
+                                                  street_name,
+                                                  number)
+        r = requests.get(default_link)
+        soup = bs(r.text, "html.parser")
+        last_page_link = soup.find("a", title=u"На последнюю страницу", href=True)
+        if not last_page_link:
+            return [default_link]
+        args = parse_qs(urlparse(last_page_link['href']).query)
+        page_args = args['page'][0]
+        page_count = [i for i in page_args.split(',') if i.isdigit() and int(i)]
+        page_count = int(str(page_count[0])) + 1
+        pages_links = [self.XPON_CHECK_URL.format(self.PAGE_STATEMENT.format(str(i)),
+                                                  self.REGIONS_MAP[region],
+                                                  city,
+                                                  street_name,
+                                                  number)
+                       for i in range(page_count)]
+        return pages_links
 
     def _street_connection_data(self, street_row):
         status_data = {}
@@ -89,12 +110,14 @@ def print_result(results):
 
 
 def main():
+    a = time.time()
     args = parse_args()
-    parser = ByflyIsXponParser(region=args.region.lower(),
-                               street_name=args.street,
-                               number=args.number)
+    parser = ByflyIsXponParser()
+    parser.check_street(region=args.region.lower(),
+                        street_name=args.street,
+                        number=args.number)
+    b = time.time()
     print_result(parser.result)
-
-
+    print(b-a)
 if __name__ == "__main__":
     main()
