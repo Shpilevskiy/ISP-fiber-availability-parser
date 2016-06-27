@@ -21,6 +21,7 @@ class ByflyIsXponParser(object):
     PAGE_STATEMENT = '0,0,0,0,0,0,0,0,0,0,{}'
 
     REGIONS_MAP = {
+        "all": "All",
         "брестская": "0",
         "витебская": "1",
         "гомельская": "2",
@@ -45,7 +46,6 @@ class ByflyIsXponParser(object):
                       street_name=u"", number=u""):
 
         links = self._get_pagination_pages_links(region=region, city=city, street_name=street_name, number=number)
-        links = list(links)
         rs = (grequests.get(l) for l in links)
         results = grequests.map(rs)
         for response in results:
@@ -71,12 +71,12 @@ class ByflyIsXponParser(object):
         page_args = args['page'][0]
         page_count = [i for i in page_args.split(',') if i.isdigit() and int(i)]
         page_count = int(str(page_count[0])) + 1
-        pages_links = [self.XPON_CHECK_URL.format(self.PAGE_STATEMENT.format(str(i)),
+        pages_links = (self.XPON_CHECK_URL.format(self.PAGE_STATEMENT.format(str(i)),
                                                   self.REGIONS_MAP[region],
                                                   city,
                                                   street_name,
                                                   number)
-                       for i in range(page_count)]
+                       for i in range(page_count))
         return pages_links
 
     def _street_connection_data(self, street_row):
@@ -93,7 +93,7 @@ def parse_args():
                         help=u"Имя улицы, для которой необходимо проверить наличие подключения.",
                         default="")
     parser.add_argument('--region', '-r',
-                        help=u"Имя области для поиска. (Бресткая, Витебская и т.д.)",
+                        help=u"Имя области для поиска. (all, Бресткая, Витебская и т.д.)",
                         default=u"Минск")
     parser.add_argument('--number', '-n',
                         help=u"Номер дома, для которого необходимо проверить подключение.",
