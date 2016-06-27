@@ -1,12 +1,21 @@
 # coding: utf8
 from __future__ import print_function, unicode_literals
-from urllib.parse import urlparse, parse_qs
+
+import six
+from six.moves.urllib.parse import urlparse, parse_qs
 
 import argparse
 import re
 
-import requests, grequests
+import requests
+import grequests
 from bs4 import BeautifulSoup as bs
+
+
+def to_unicode(s):
+    if isinstance(s, six.binary_type):
+        return s.decode('utf-8')
+    return s
 
 
 class ByflyIsXponParser(object):
@@ -21,14 +30,14 @@ class ByflyIsXponParser(object):
     PAGE_STATEMENT = '0,0,0,0,0,0,0,0,0,0,{}'
 
     REGIONS_MAP = {
-        "all": "All",
-        "брестская": "0",
-        "витебская": "1",
-        "гомельская": "2",
-        "гродненская": "3",
-        "минская": "4",
-        "могилевская": "5",
-        "минск": "6"
+        u"all": "All",
+        u"брестская": "0",
+        u"витебская": "1",
+        u"гомельская": "2",
+        u"гродненская": "3",
+        u"минская": "4",
+        u"могилевская": "5",
+        u"минск": "6"
     }
 
     FIELD_CLASS_MAP = {
@@ -45,18 +54,23 @@ class ByflyIsXponParser(object):
     def check_address(self, region=u"Минск", city=u"Минск",
                       street_name=u"", number=u""):
 
-        links = self._get_pagination_pages_links(region=region, city=city, street_name=street_name, number=number)
+        links = self._get_pagination_pages_links(region=region, city=city,
+                                                 street_name=street_name,
+                                                 number=number)
         rs = (grequests.get(l) for l in links)
         results = grequests.map(rs)
-        for response in results:
-            soup = bs(response.text, "html.parser")
-            rows = soup.find_all("tr", class_=re.compile(r"(odd|even)"))
-            self.result += [self._street_connection_data(r) for r in rows]
+        for r in results:
+            self.result.extend(list(self._connection_from_page_response(r)))
         return self.result
+
+    def _connection_from_page_response(self, response):
+        soup = bs(response.text, "html.parser")
+        rows = soup.find_all("tr", class_=re.compile(r"(odd|even)"))
+        return (self._street_connection_data(r) for r in rows)
 
     def _get_pagination_pages_links(self, region, city,
                                     street_name, number):
-
+        street_name = to_unicode(street_name)
         default_link = self.XPON_CHECK_URL.format(self.PAGE_STATEMENT.format('0'),
                                                   self.REGIONS_MAP[region],
                                                   city,
@@ -91,13 +105,13 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--street', '-s',
                         help=u"Имя улицы, для которой необходимо проверить наличие подключения.",
-                        default="")
+                        default=u"")
     parser.add_argument('--region', '-r',
                         help=u"Имя области для поиска. (all, Бресткая, Витебская и т.д.)",
                         default=u"Минск")
     parser.add_argument('--number', '-n',
                         help=u"Номер дома, для которого необходимо проверить подключение.",
-                        default=""
+                        default=u""
                         )
     return parser.parse_args()
 
